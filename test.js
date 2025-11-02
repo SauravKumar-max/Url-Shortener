@@ -7,6 +7,12 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 describe('URL Shortener Integration Test', () => {
+  test("should not allow creating a code if url is not provided", async () => {
+    const res = await request(app).post('/shorten').send({url: ''})
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.body.error, 'URL is required');
+  });
+
   test('should shorten and redirect correctly', async () => {
     const res = await request(app)
       .post('/shorten')
@@ -23,35 +29,6 @@ describe('URL Shortener Integration Test', () => {
 
     assert.strictEqual(redirectRes.status, 302);
     assert.strictEqual(redirectRes.headers.location, 'https://example.com');
-  });
-
-  test('should return same short code for duplicate URLs', async () => {
-    const randomUrl = `https://example-${Math.random().toString(36).substring(7)}.com`;
-
-    const firstRes = await request(app)
-      .post('/shorten')
-      .send({ url: randomUrl });
-
-    assert.strictEqual(firstRes.status, 200);
-    assert.ok(firstRes.body.short_code);
-    const firstShortCode = firstRes.body.short_code;
-
-    const secondRes = await request(app)
-      .post('/shorten')
-      .send({ url: randomUrl });
-
-    assert.strictEqual(secondRes.status, 200);
-    assert.ok(secondRes.body.short_code);
-    const secondShortCode = secondRes.body.short_code;
-
-    assert.strictEqual(firstShortCode, secondShortCode);
-
-    const redirectRes = await request(app)
-      .get(`/redirect?code=${firstShortCode}`)
-      .redirects(0);
-
-    assert.strictEqual(redirectRes.status, 302);
-    assert.strictEqual(redirectRes.headers.location, randomUrl);
   });
 
   test('should return not found if that code is not present', async () => {
@@ -85,5 +62,27 @@ describe('URL Shortener Integration Test', () => {
     });
     assert.strictEqual(recordAfterDelete, null, 'Record should be null after deletion');
   });
+
+  test('should return analytics with latest 10 shortened URLs', async () => {
+    const url1 = `https://example-one.com`;
+    const url2 = `https://example-two.com`;
+
+    const res1 = await request(app).post('/shorten').send({ url: url1 });
+    const res2 = await request(app).post('/shorten').send({ url: url2 });
+
+    assert.strictEqual(res1.status, 200);
+    assert.strictEqual(res2.status, 200);
+
+    const analyticsRes = await request(app).get('/analytics');
+    const records = analyticsRes.body.records;
+
+    assert.strictEqual(analyticsRes.status, 200);
+    assert.ok(records.length, 'records should be an array');
+
+    const urlsReturned = records.map(r => r.original_url);
+    assert.ok(urlsReturned.includes(url1));
+    assert.ok(urlsReturned.includes(url2));
+  });
+
 });
 

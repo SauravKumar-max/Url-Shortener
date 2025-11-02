@@ -13,6 +13,7 @@ model UrlShortener {
   short_code   String   @unique
   visit_count  Int      @default(0)
   created_at   DateTime @default(now())
+  last_accessed_at DateTime?
   
   @@map("url_shortener")
 }
