@@ -9,6 +9,16 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to URL Shortener' });
 });
 
+app.get('/analytics', async (req, res) => {
+  try {
+    const records = await prisma.urlShortener.findMany({orderBy: { created_at: 'desc' }, take: 10})
+    return res.json({ records });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
 app.post('/shorten', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
@@ -36,6 +46,10 @@ app.get('/redirect', async (req, res) => {
   try {
     const record = await prisma.urlShortener.findUnique({ where: { short_code: code } });
     if (!record) return res.status(404).send('Not found');
+    await prisma.urlShortener.update({where: {short_code: code}, data: {
+      visit_count: { increment: 1 },
+      last_accessed_at: new Date()
+    }})
     return res.redirect(record.original_url);
   } catch (err) {
     console.error(err);
