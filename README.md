@@ -15,6 +15,12 @@ Install dependencies:
 yarn install
 ```
 
+Generate the Prisma client
+
+```bash
+yarn prisma:generate
+```
+
 Start the development server:
 
 ```bash
@@ -33,24 +39,108 @@ yarn test
 
 ## API Endpoints
 
-### Creating a short code
+### Create a Short URL
 
-**POST** `http://localhost:7070/shorten`
+**POST** `/shorten`
 
-Request body:
+Request Body:
 ```json
 {
-  "url": "https://saurav-kumar.vercel.com"
+  "url": "https://example.com",
+  "expiryDate": "2025-01-01",
+  "customCode": "mycode",
+  "password": "secret"
 }
 ```
 
-### Redirecting using the short code
+Response:
+```json
+{ "short_code": "mycode" }
+```
 
-**GET** `http://localhost:7070/redirect?code=<short_code>`
+---
 
-### Deleting a code
+### Redirect
 
-**DELETE** `http://localhost:7070/shorten/<short_code>`
+**GET** `/redirect?code=<short_code>[&password=...]`
+
+- Redirects to the original URL  
+- Returns error if:
+  - The short code is expired or deleted
+  - A password is required and not provided / incorrect
+
+---
+
+### Delete a Short URL
+
+**DELETE** `/shorten/<short_code>`
+
+- Only the owner of the code can delete it  
+- Marks the entry as soft-deleted
+
+---
+
+### Update Expiry / Password
+
+**PUT** `/shorten/<short_code>`
+
+Request Body:
+```json
+{
+  "expiryDate": "2025-12-30",
+  "password": "newpass"
+}
+```
+
+---
+
+### List URLs for the User
+
+**GET** `/list`
+
+Returns all active URLs belonging to the user.
+
+---
+
+### Analytics (Latest 10 URLs)
+
+**GET** `/analytics`
+
+Returns the latest 10 non-deleted shortened URLs.
+
+---
+
+### Bulk Shorten (Enterprise Tier Only)
+
+**POST** `/shorten/batch`
+
+Request Body:
+```json
+{
+  "urls": ["https://a.com", "https://b.com"]
+}
+```
+
+Response:
+```json
+{
+  "urls": [
+    { "url": "https://a.com", "short_code": "abc123" },
+    { "url": "https://b.com", "short_code": "xyz890" }
+  ]
+}
+```
+
+---
+
+### Health Check
+
+**GET** `/health`
+
+Response:
+```json
+{ "status": "ok", "server": "running", "database": "connected" }
+```
 
 ----------------------------------------------------------------------------------------
 
