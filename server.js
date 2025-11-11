@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 app.use(express.json());
 
 app.use(async (req, res, next) => {
+  if (['/', '/health'].includes(req.path)) return next()
   try {
     await prisma.requestLog.create({
       data: {
@@ -18,8 +19,34 @@ app.use(async (req, res, next) => {
   } catch (error) {
     console.error('Failed to save request log:', error);
   }
-
   next();
+});
+
+app.use(async (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+
+  if (!apiKey) {
+    return res.status(401).json({ error: 'API key is missing' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { api_key: apiKey }
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid User' });
+    }
+
+    if(req.path === '/shorten/batch' && user.tier !== 'enterprise'){
+      return res.status(403).json({ error: 'Bulk creation not allowed.' });
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error(err);
+  }
 });
 
 app.get('/', (req, res) => {
@@ -68,11 +95,6 @@ app.post('/shorten', async (req, res) => {
 app.post('/shorten/batch', async (req, res) => {
   const { urls } = req.body;
   const user = req.user;
-
-  const users = await prisma.user.findUnique({ where: { id: user.id } });
-  if (!users || users.tier !== 'enterprise') {
-    return res.status(403).json({ error: 'Bulk creation not allowed.' });
-  }
 
   if (!Array.isArray(urls) || urls.length === 0) {
     return res.status(400).json({ error: 'URLs are required' });

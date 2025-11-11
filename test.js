@@ -16,7 +16,6 @@ beforeEach(async () => {
     data: { id: 1, email: 'enterprise@gmail.com', api_key: 'KEY123', tier: 'enterprise' }
   });
   currentUserId = 1
-
 });
 
 before(() => {
@@ -41,7 +40,7 @@ describe('URL Shortener Integration Test', () => {
   test("should not allow creating a code if url is not provided", async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: '' });
 
     assert.strictEqual(res.status, 400);
@@ -51,7 +50,7 @@ describe('URL Shortener Integration Test', () => {
   test('should shorten and redirect correctly', async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example.com' });
 
     assert.strictEqual(res.status, 200);
@@ -61,6 +60,7 @@ describe('URL Shortener Integration Test', () => {
 
     const redirectRes = await request(app)
       .get(`/redirect?code=${shortCode}`)
+      .set('x-api-key', 'KEY123')
       .redirects(0);
 
     assert.strictEqual(redirectRes.status, 302);
@@ -71,7 +71,7 @@ describe('URL Shortener Integration Test', () => {
     const expiredDate = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example.com', expiryDate: expiredDate});
 
     assert.strictEqual(res.status, 200);
@@ -85,7 +85,7 @@ describe('URL Shortener Integration Test', () => {
   test('should return error if the the user is trying to create custom code but its already present', async () => {
     const oldRes = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example.com'});
 
     assert.strictEqual(oldRes.status, 200);
@@ -93,7 +93,7 @@ describe('URL Shortener Integration Test', () => {
 
    const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example-two.com', customCode: oldRes.body.short_code});
 
     assert.strictEqual(res.status, 400);
@@ -104,7 +104,7 @@ describe('URL Shortener Integration Test', () => {
   test('should create using the custom code', async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example.com',  customCode: 'awesome-article'});
 
     assert.strictEqual(res.status, 200);
@@ -116,6 +116,7 @@ describe('URL Shortener Integration Test', () => {
 
     const redirectRes = await request(app)
       .get(`/redirect?code=${randomCode}`)
+      .set('x-api-key', 'KEY123')
       .redirects(0);
 
     assert.strictEqual(redirectRes.status, 404);
@@ -126,7 +127,7 @@ describe('URL Shortener Integration Test', () => {
     const expiredDate = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example.com', expiryDate: expiredDate});
 
     assert.strictEqual(res.status, 200);
@@ -136,6 +137,7 @@ describe('URL Shortener Integration Test', () => {
 
     const redirectRes = await request(app)
       .get(`/redirect?code=${shortCode}`)
+      .set('x-api-key', 'KEY123')
       .redirects(0);
 
     assert.strictEqual(redirectRes.status, 404);
@@ -145,7 +147,7 @@ describe('URL Shortener Integration Test', () => {
   test('should delete a short code', async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example.com' });
 
     assert.strictEqual(res.status, 200);
@@ -153,7 +155,7 @@ describe('URL Shortener Integration Test', () => {
 
     const shortCode = res.body.short_code;
 
-    const deleteRes = await request(app).delete(`/shorten/${shortCode}`).set('Authorization', 'KEY123');
+    const deleteRes = await request(app).delete(`/shorten/${shortCode}`).set('x-api-key', 'KEY123');
 
     assert.strictEqual(deleteRes.status, 200);
     assert.strictEqual(deleteRes.body.message, 'Short code deleted successfully');
@@ -171,14 +173,14 @@ describe('URL Shortener Integration Test', () => {
     const url1 = `https://example-one.com`;
     const url2 = `https://example-two.com`;
 
-    const res1 = await request(app).post('/shorten').set('Authorization', 'KEY123').send({ url: url1 });
+    const res1 = await request(app).post('/shorten').set('x-api-key', 'KEY123').send({ url: url1 });
 
-    const res2 = await request(app).post('/shorten').set('Authorization', 'KEY123').send({ url: url2 });
+    const res2 = await request(app).post('/shorten').set('x-api-key', 'KEY123').send({ url: url2 });
 
     assert.strictEqual(res1.status, 200);
     assert.strictEqual(res2.status, 200);
 
-    const analyticsRes = await request(app).get('/analytics');
+    const analyticsRes = await request(app).get('/analytics').set('x-api-key', 'KEY123');
     const records = analyticsRes.body.records;
 
     assert.strictEqual(analyticsRes.status, 200);
@@ -192,7 +194,7 @@ describe('URL Shortener Integration Test', () => {
   test('should fail for all if any URL is missing in batch creation', async () => {
     const res = await request(app)
       .post('/shorten/batch')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({
         urls: [
           'https://example1.com',
@@ -210,7 +212,7 @@ describe('URL Shortener Integration Test', () => {
   test('should shorten multiple URLs in one batch request', async () => {
     const res = await request(app)
       .post('/shorten/batch')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({
         urls: [
           'https://example1.com',
@@ -239,7 +241,7 @@ describe('URL Shortener Integration Test', () => {
 
     const res = await request(app)
       .post('/shorten/batch')
-      .set('Authorization', 'KEY231')
+      .set('x-api-key', 'KEY231')
       .send({ urls: ['https://a.com', 'https://b.com'] });
 
     assert.strictEqual(res.status, 403);
@@ -252,7 +254,7 @@ describe('URL Shortener Integration Test', () => {
   test('should allow editing of the expiry date', async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example.com', expiryDate:  new Date(Date.now()).toISOString() });
 
     assert.strictEqual(res.status, 200);
@@ -266,7 +268,7 @@ describe('URL Shortener Integration Test', () => {
 
     const updateRes = await request(app)
       .put(`/shorten/${shortCode}`)
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({expiryDate: new Date(Date.now() - 60 * 60 * 1000).toISOString()});
 
     assert.strictEqual(updateRes.status, 200);
@@ -284,7 +286,7 @@ describe('URL Shortener Integration Test', () => {
   test('should allow creating a short code with a password', async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({
         url: 'https://secured.com',
         password: 'mypassword123'
@@ -303,7 +305,7 @@ describe('URL Shortener Integration Test', () => {
   test('should allow updating the password', async () => {
     const createRes = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example-protected.com' });
 
     assert.strictEqual(createRes.status, 200);
@@ -317,7 +319,7 @@ describe('URL Shortener Integration Test', () => {
 
     const updateRes = await request(app)
       .put(`/shorten/${shortCode}`)
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ password: 'new-password', expiryDate:  new Date(Date.now()).toISOString() });
 
     assert.strictEqual(updateRes.status, 200);
@@ -334,7 +336,7 @@ describe('URL Shortener Integration Test', () => {
   test('should not allow redirect when password is required but not provided', async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({
         url: 'https://locked.com',
         password: '"incorrect-password'
@@ -345,6 +347,7 @@ describe('URL Shortener Integration Test', () => {
 
     const redirectRes = await request(app)
       .get(`/redirect?code=${shortCode}`)
+      .set('x-api-key', 'KEY123')
       .redirects(0);
 
     assert.strictEqual(redirectRes.status, 403);
@@ -354,7 +357,7 @@ describe('URL Shortener Integration Test', () => {
   test('should allow redirect when correct password is provided', async () => {
     const res = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({
         url: 'https://secret-url.com',
         password: 'open-sesame'
@@ -365,6 +368,7 @@ describe('URL Shortener Integration Test', () => {
 
     const redirectRes = await request(app)
       .get(`/redirect?code=${shortCode}&password=open-sesame`)
+      .set('x-api-key', 'KEY123')
       .redirects(0);
 
     assert.strictEqual(redirectRes.status, 302);
@@ -374,12 +378,12 @@ describe('URL Shortener Integration Test', () => {
   test('should list all URLs of the user', async () => {
     const res1 = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example-one.com' });
 
     const res2 = await request(app)
       .post('/shorten')
-      .set('Authorization', 'KEY123')
+      .set('x-api-key', 'KEY123')
       .send({ url: 'https://example-two.com' });
 
     assert.strictEqual(res1.status, 200);
@@ -387,11 +391,11 @@ describe('URL Shortener Integration Test', () => {
 
     await request(app)
       .delete(`/shorten/${res1.body.short_code}`)
-      .set('Authorization', 'KEY123');
+      .set('x-api-key', 'KEY123');
 
     const listRes = await request(app)
       .get('/list')
-      .set('Authorization', 'KEY123');
+      .set('x-api-key', 'KEY123');
 
     assert.strictEqual(listRes.status, 200);
     assert.ok(Array.isArray(listRes.body.urls));
