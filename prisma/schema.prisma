@@ -35,3 +35,12 @@ model User {
 
   urls       UrlShortener[]
 }
+
+model RequestLog {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime @default(now())
+  method    String
+  url       String
+  userAgent String?
+  ip        String?
+}

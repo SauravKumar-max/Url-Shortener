@@ -5,6 +5,23 @@ const prisma = new PrismaClient();
 
 app.use(express.json());
 
+app.use(async (req, res, next) => {
+  try {
+    await prisma.requestLog.create({
+      data: {
+        method: req.method,
+        url: req.originalUrl,
+        userAgent: req.headers['user-agent'],
+        ip: req.ip
+      }
+    });
+  } catch (error) {
+    console.error('Failed to save request log:', error);
+  }
+
+  next();
+});
+
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to URL Shortener' });
 });
