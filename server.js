@@ -2,10 +2,14 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const app = express();
 const prisma = new PrismaClient();
+const fs = require('fs');
+const path = require('path');
 
 app.use(express.json());
 
+// Log middleware
 app.use(async (req, res, next) => {
+  const start = Date.now();
   if (['/', '/health'].includes(req.path)) return next()
   try {
     await prisma.requestLog.create({
@@ -18,11 +22,43 @@ app.use(async (req, res, next) => {
     });
   } catch (error) {
     console.error('Failed to save request log:', error);
+  } finally {
+      const duration = Date.now() - start;
+      console.log(`Timing Log middleware ${duration}ms`);
   }
   next();
 });
 
+
+// Blacklist middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const apiKey = req.headers['x-api-key'];
+
+   if (!apiKey) {
+    next()
+  }
+
+  try {
+    const configPath = path.join(__dirname, 'config', 'blacklist.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+    if (config.blockedKeys.includes(apiKey)) {
+      return res.status(403).json({ error: 'This API key is blacklisted.' });
+    }
+  } catch (err) {
+    console.error('Blacklist read error:', err);
+  }finally {
+    const duration = Date.now() - start;
+    console.log(`Timing Blacklist middleware ${duration}ms`);
+  }
+
+  next();
+});
+
+// Authentication middleware
 app.use(async (req, res, next) => {
+  const start = Date.now();
   const apiKey = req.headers['x-api-key'];
 
   if (!apiKey) {
@@ -38,15 +74,55 @@ app.use(async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid User' });
     }
 
-    if(req.path === '/shorten/batch' && user.tier !== 'enterprise'){
-      return res.status(403).json({ error: 'Bulk creation not allowed.' });
-    }
-
     req.user = user;
     next();
   } catch (err) {
     console.error(err);
+  } finally {
+      const duration = Date.now() - start;
+      console.log(`Timing Authentication middleware ${duration}ms`);
   }
+});
+
+
+// Authorization middleware
+app.use(async (req, res, next) => {
+  const start = Date.now();
+  try {
+    const user = req.user;
+
+    if(req.path === '/shorten/batch' && user.tier !== 'enterprise'){
+      return res.status(403).json({ error: 'Bulk creation not allowed.' });
+    }
+
+    next();
+  } catch (err) {
+    console.error(err);
+  } finally {
+      const duration = Date.now() - start;
+      console.log(`Timing Authorization middleware ${duration}ms`);
+  }
+});
+
+// Changing responsse header middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  try {
+    const originalSend = res.send;
+
+    res.send = function (body) {
+      const diff = Date.now() - start;
+      res.setHeader('X-Response-Time', `${diff}ms`);
+      return originalSend.call(this, body);
+    };
+  } catch (error) {
+    console.log({error})
+  } finally {
+      const duration = Date.now() - start;
+      console.log(`Timing response header middleware ${duration}ms`);
+  }
+  
+  next();
 });
 
 app.get('/', (req, res) => {

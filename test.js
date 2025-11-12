@@ -1,6 +1,8 @@
 const { test, describe, before, afterEach, beforeEach } = require('node:test');
 const assert = require('node:assert');
 const request = require('supertest');
+const fs = require('fs');
+const path = require('path');
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
@@ -404,6 +406,29 @@ describe('URL Shortener Integration Test', () => {
 
     assert.ok(urls.includes('https://example-two.com')); 
     assert.ok(!urls.includes('https://example-one.com')); 
+  });
+
+  test('should block requests with a blacklisted API key', async () => {
+    const configPath = path.join(__dirname, 'config', 'blacklist.json');
+    fs.writeFileSync(configPath, JSON.stringify({ blockedKeys: ['KEY321'] }));
+
+    const res = await request(app)
+      .get('/health')
+      .set('x-api-key', 'KEY321');
+
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.body.error, 'This API key is blacklisted.');
+  });
+
+  test('should include X-Response-Time header in the response', async () => {
+    const res = await request(app)
+      .get('/health')
+      .set('x-api-key', 'KEY123');
+
+    assert.ok(res.headers['x-response-time'], 'X-Response-Time header is missing');
+    assert.match(res.headers['x-response-time'], /^\d+ms$/, 'Invalid X-Response-Time format');
+    const time = parseInt(res.headers['x-response-time'].replace('ms', ''), 10);
+    assert.ok(time >= 0, 'X-Response-Time should be non-negative');
   });
 
 
